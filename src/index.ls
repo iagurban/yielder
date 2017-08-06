@@ -8,9 +8,26 @@ is-generator = (obj) -> 'function' == typeof obj.next and 'function' == typeof o
 GeneratorFunction = Object.get-prototype-of (!->*) .constructor
 is-generator-function = -> (it instanceof GeneratorFunction) or is-generator it
 
+default-yieldables =
+  number: false
+  string: false
+  plain-object: true
+  array: true
+  iterable: true
+  object: false
+
+class UnsupportedYieldable
+  ->
+    Error.constructor.call @
+    @message = &0
+    @stack = new Error! .stack
+
+  @:: = new Error!
+
 create = (options ? {}) ->
-  nostrict-mode = (\strict of options) and not options.strict
-  nostrict-objects-mode = (\strictObjects of options) and not options.strict-objects
+  {yieldables ? {}} = options
+
+  _.defaults yieldables, default-yieldables
 
   converters =
     object: (obj) ->
@@ -19,12 +36,19 @@ create = (options ? {}) ->
         results = {}
 
         _.for-own obj, (v, k) ->
-          | (promise = to-promise v)
+          promise =
+            try
+              to-promise v
+            catch e
+              throw unless e instanceof UnsupportedYieldable
+              null
+
+          if promise
             ++waiting
             promise
             .then (results[k]) -> resolve results if --waiting < 1
             .catch reject
-          | _ => results[k] = v
+          else results[k] = v
 
         resolve results if waiting < 1
 
@@ -34,25 +58,76 @@ create = (options ? {}) ->
 
     promise: _.identity
 
-  to-promise = _.thru do
-    _.assign do
-      (obj) ->
-        | !obj or _.some [_.is-number, _.is-string], (obj|>) => null
-        | is-promise obj => obj
-        | is-generator-function obj => converters.generator obj
-        | 'function' == typeof obj => converters.async obj
-        | Symbol.iterator of obj => converters.iterable obj
-        | nostrict-objects-mode or Object == obj.constructor => converters.object obj
-        | _ => null
+  define-step = (predicate, normal, is-allowed, message) ->
+    [
+      predicate
+      if is-allowed => normal else -> throw new UnsupportedYieldable message
+    ]
 
-      converters
+  unsupported = -> null
 
-    (orig) -> options.to-promise and (-> options.to-promise it, orig) or orig
+  to-promise-steps = [
+    [
+      -> !it
+      unsupported
+    ]
+    define-step do
+      _.is-number
+      unsupported
+      yieldables.number
+      'yielding numbers is forbidden'
+    define-step do
+      _.is-string
+      unsupported
+      yieldables.number
+      'yielding strings is forbidden'
+    define-step do
+      is-promise
+      -> it
+      true
+    define-step do
+      is-generator-function
+      converters.generator
+      true
+    define-step do
+      -> 'function' == typeof it
+      converters.async
+      true
+    define-step do
+      Array.is-array
+      converters.iterable
+      yieldables.array or yieldables.iterable
+      'yielding arrays is forbidden'
+    define-step do
+      -> Symbol.iterator of it
+      converters.iterable
+      yieldables.iterable
+      'yielding iterables is forbidden'
+    define-step do
+      -> Object == it.constructor
+      converters.object
+      yieldables.plain-object
+      'yielding any objects is forbidden'
+    define-step do
+      _.is-object
+      converters.object
+      yieldables.object
+      'yielding non-Object objects is forbidden'
+  ]
 
-  to-promise = let orig = to-promise
-    (o) ->
-      with orig o
-        throw new Error '' if ..? and (('function' != typeof ..then) or ('function' != typeof ..catch))
+  to-promise =
+    _ _.assign do
+        (obj) ->
+          for [predicate, processor] in to-promise-steps
+            return processor obj if predicate obj
+        converters
+
+    .thru (orig) -> options.to-promise and (-> options.to-promise it, orig) or orig
+    .thru (orig) ->
+      (o) ->
+        with orig o
+          throw new Error '' if ..? and (('function' != typeof ..then) or ('function' != typeof ..catch))
+    .value!
 
   iterator-promise = (iterator) ->
     new Promise (resolve, reject) !->
@@ -60,7 +135,14 @@ create = (options ? {}) ->
       results = []
       waiting = 0
       until (t = iterator.next!).done
-        if promise = to-promise t.value
+        promise =
+          try
+            to-promise t.value
+          catch e
+            throw e unless e instanceof UnsupportedYieldable
+            null
+
+        if promise
           let idx = results.length
             results.push null
             ++waiting
@@ -71,11 +153,6 @@ create = (options ? {}) ->
           results.push t.value
       resolve results if waiting < 1
 
-  on-non-promise = switch
-    | nostrict-mode => -> &1 &0
-    | _ => -> &2 new TypeError "Yielded non-yieldable object: \"#{try (String &0) catch => "<#{typeof &0}>"}\"
-                              \ (see 'selectConverter' option)"
-
   main = (gen, ...args) ->
     new Promise (resolve, reject) !->
       gen .= apply null, args if typeof gen == 'function'
@@ -84,20 +161,15 @@ create = (options ? {}) ->
       on-fulfilled = (method, res) ->
         try
           {done, value} = gen[method] res
-        catch e
-          return reject e
+        catch e => return reject e
 
         switch
         | done => resolve value
-        | _
-          on-rejected = on-fulfilled.bind null, 'throw'
-          switch
-          | to-promise value => that.then on-resolved, on-rejected
-          | _ => on-non-promise value, on-resolved, on-rejected
+        | to-promise value => that.then on-resolved, on-fulfilled.bind null, 'throw'
+        | _ => on-resolved value
 
       do (on-resolved = on-fulfilled.bind null, 'next')
 
 
 module.exports = _.thru create!, (orig) -> _.assign orig,
   create: create
-  # wrap:  (fn) -> (-> orig fn.apply null, &) <<< '__generatorFunction__': fn
