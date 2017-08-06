@@ -1,0 +1,6 @@
+node_modules
+coverage
+*.sublime-workspace
+*.sublime-project
+.test
+package-lock.json
