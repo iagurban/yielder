@@ -30,19 +30,20 @@ create = (options ? {}) ->
 
     iterable: (iterable) -> iterator-promise iterable[Symbol.iterator]!
     generator: (obj) -> main obj
+    async: (fn) -> new Promise (resolve, reject) !-> fn (err, r) !-> if err => reject err else resolve r
 
     promise: _.identity
 
   to-promise = _.thru do
     _.assign do
       (obj) ->
-        obj |> switch
-          | !obj or _.some [_.is-number, _.is-string], (obj|>) => -> null
-          | is-promise obj => converters.promise
-          | is-generator-function obj => converters.generator
-          | Symbol.iterator of obj => converters.iterable
-          | nostrict-objects-mode or Object == obj.constructor => converters.object
-          | _ => -> null
+        | !obj or _.some [_.is-number, _.is-string], (obj|>) => null
+        | is-promise obj => obj
+        | is-generator-function obj => converters.generator obj
+        | 'function' == typeof obj => converters.async obj
+        | Symbol.iterator of obj => converters.iterable obj
+        | nostrict-objects-mode or Object == obj.constructor => converters.object obj
+        | _ => null
 
       converters
 

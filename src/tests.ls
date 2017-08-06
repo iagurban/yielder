@@ -57,6 +57,14 @@ describe 'main', (___) ->
     .should.eventually.eql [3, 4, 5]
   ]
 
+  it 'async to promise', -> Promise.all [
+    yielder ~>* yield (next) -> next null, 5
+    .should.eventually.eql 5
+
+    yielder ~>* yield (next) -> next (new Error), 123
+    .should.be.rejected
+  ]
+
   it 'object to promise', -> Promise.all [
     yielder ~>* yield {
       a: ~>* 4
