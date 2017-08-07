@@ -25,9 +25,6 @@ describe 'main', (___) ->
     yielder ->* 1
     .should.eventually.equal 1
 
-    yielder ((arg) ->* arg), 123
-    .should.eventually.equal 123
-
     nostrict-yielder ->* yield 2
     .should.eventually.equal 2
 

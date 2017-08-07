@@ -65,17 +65,27 @@ create = (options ? {}) ->
           | _ => results.push t.value
         resolve results if waiting < 1
 
-    generator = (obj) -> main obj
+    generator = (obj) -> new Promise (resolve, reject) !->
+      on-fulfilled = (method, res) ->
+        try
+          {done, value} = obj[method] res
+        catch e => return reject e
+
+        switch
+        | done => resolve value
+        | not value? => on-resolved value
+        | to-promise value => that.then on-resolved, on-fulfilled.bind null, 'throw'
+        | _ => on-fulfilled 'throw', new UnsupportedYieldable "non yieldable: #{value}"
+
+      do (on-resolved = on-fulfilled.bind null, 'next')
+    generator-function = (obj) -> generator obj!
     async = (fn) -> new Promise (resolve, reject) !-> fn !-> if &0 => reject &0 else resolve &1
-    promise = _.identity
-    unknown = (o) -> new Promise (o |>) unless strict
+    promise = -> it
+    unknown = strict and (-> null) or (o) -> new Promise (o |>)
 
     (o) ->
       switch (typeof o)
-      | \function
-        return switch
-          | o instanceof GeneratorFunction => generator
-          | _ => async
+      | \function =>  o instanceof GeneratorFunction and generator-function or async
 
       | \object
         return switch
@@ -98,24 +108,7 @@ create = (options ? {}) ->
             throw new Error '' if ..? and not is-promise ..
       | _ => fallback
 
-  main = (gen, ...args) ->
-    new Promise (resolve, reject) !->
-      gen .= apply null, args if typeof gen == 'function'
-      return resolve gen if !gen or typeof gen.next != 'function'
-
-      on-fulfilled = (method, res) ->
-        try
-          {done, value} = gen[method] res
-        catch e => return reject e
-
-        switch
-        | done => resolve value
-        | not value? => on-resolved value
-        | to-promise value => that.then on-resolved, on-fulfilled.bind null, 'throw'
-        | _ => on-fulfilled 'throw', new UnsupportedYieldable "non yieldable: #{value}"
-
-      do (on-resolved = on-fulfilled.bind null, 'next')
-
+  main-promisificationator = to-promise
 
 module.exports = _.thru create!, (orig) -> _.assign orig,
   create: create
