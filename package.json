@@ -1,6 +1,6 @@
 {
   "name": "yielder",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Turns various stuff to coroutines so you can write solid and linear asynchronous code",
   "main": "lib/index.js",
   "scripts": {
