@@ -16,8 +16,8 @@ Use it as follows
 ```javascript
 yielder = require('yielder');
 
-// yielder is function
-// yielder.create is a function for creating defferently configured yielder
+// yielder is a function
+// yielder.create is a function for creating differently configured yielder
 
 yielder(function*(){
   return (yield [
@@ -35,8 +35,10 @@ yielder(function*(){
 
     function(next) { return next(null, 5); }
   ]);
-}); // => [3, 4, 1, 5]
-// (because all items of yielded [] will be also yielded, and scalars returned)
+}).then(function(result){
+   // result => [3, 4, 1, 5]
+   // (because children of yielded [] will be also yielded)
+});
 ```
 
 
