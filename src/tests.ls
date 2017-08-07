@@ -9,6 +9,7 @@ chai.should!
 chai.use require "chai-as-promised"
 
 nostrict-yielder = yielder.create do
+  strict: false
   yieldables:
     number: true
     string: true
@@ -40,15 +41,14 @@ describe 'main', (___) ->
     .should.eventually.equal null
 
     nostrict-yielder ->*
-      done = false
       yield {
         next: ->
-          done: true, value: 1
+          done: true, value: 1657656578
         throw: ->
-          done: true
-          value: new Error 'err'
+          done: true, value: new Error 'err'
       }
-    .should.eventually.equal 1
+
+    .should.eventually.equal 1657656578
   ]
 
   it 'promise to promise', -> Promise.all [
@@ -78,8 +78,8 @@ describe 'main', (___) ->
     (yielder.create yieldables: {array: true, iterable: false}) (~>* yield new TestIterable)
     .should.be.rejected
 
-    (yielder.create yieldables: {array: false, iterable: true}) (~>* yield [1 2 3])
-    .should.eventually.eql [1 2 3]
+    (yielder.create yieldables: {array: false, iterable: true}) (~>* yield [1 2 3 null])
+    .should.eventually.eql [1 2 3 null]
 
     (yielder.create yieldables: {array: false, iterable: false}) (~>* yield [1 2 3])
     .should.be.rejected
@@ -91,6 +91,19 @@ describe 'main', (___) ->
 
     yielder ~>* yield (next) -> next (new Error), 123
     .should.be.rejected
+  ]
+
+  then-mock = (value) -> -> set-timeout (it.bind null, value), 0
+
+  it 'strict-promises', -> Promise.all [
+    yielder ~>* yield then: then-mock 123123
+    .should.eventually.eql 123123
+
+    (yielder.create strict-promises: true) (->* yield then: then-mock 123123)
+    .should.be.rejected
+
+    (yielder.create strict-promises: true) (->* yield then: (then-mock 123123), catch: ->)
+    .should.eventually.eql 123123
   ]
 
   it 'object to promise', -> Promise.all [
