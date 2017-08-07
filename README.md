@@ -36,7 +36,7 @@ yielder(function*(){
     function(next) { return next(null, 5); }
   ]);
 }).then(function(result){
-   // result => [3, 4, 1, 5]
+   // result => [3, 4, 5, 1, 5]
    // (because children of yielded [] will be also yielded)
 });
 ```
