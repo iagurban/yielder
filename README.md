@@ -92,6 +92,7 @@ yielder2(function*(){ return (yield 1); }); // ok: 1
 
 #### `yielder(yieldable): Promise`
 > Default yielder function created by `yielder.create({})`.
+> Starts execution of `yieldable` and returns promise, which will be resolved with result of `yieldable`'s execution or rejects with error thrown during it.
 
 #### `yielder.create(opts): yielder`
 > Creates yielder-function configured according to `opts`.
@@ -102,7 +103,7 @@ yielder2(function*(){ return (yield 1); }); // ok: 1
   | --- | --- | --- | --- |
   | **strict** | _bool_ | `true` | If `true`, yielding non-yieldable types is prohibited and breaks execution with rejecting resulting promise |
   | **strictPromises** | _bool_ | `false` | Default yieldables-detector will treat object with `.then()` method as promise only when `.catch()` method also exists. Try set it to `true` if your objects has `.next()` method and improperly used by yielder like promise |
-  | **toPromise** | _fn_&nbsp;\|&nbsp;_null_ | `null` |
+  | **toPromise** | _fn_&nbsp;\|&nbsp;_null_ | `null` | `function(object, fallback): Promise` returns promise or null if handling didn't succeed. `fallback` function is default conversion function for this yielder (according to options). Also it gives access to concrete converters (warning, no check for argument is performed): `fallback.async`, `fallback.generator`, `fallback.generatorFunction`, `fallback.iterable`, `fallback.object`.
   | yieldables.**array**       | _bool_ | `true`  | Native arrays are composite yieldables
   | yieldables.**iterable**    | _bool_ | `false` | Any objects with `[Symbol.iterator]()` method are composite yieldables
   | yieldables.**plainObject** | _bool_ | `true`  | Object's direct instances are keyed composite yieldables
@@ -111,4 +112,3 @@ yielder2(function*(){ return (yield 1); }); // ok: 1
 Keyed composite yieldable uses only own object's properties to collect results.
 
 ##### _returns_ `function(yieldable): Promise`
-> Starts execution of `yieldable` and returns promise, which will be resolved with result of `yieldable`'s execution or rejects with error thrown during it.
