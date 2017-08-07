@@ -10,17 +10,23 @@ chai.use require "chai-as-promised"
 
 nostrict-yielder = yielder.create do
   strict: false
-  yieldables:
-    number: true
-    string: true
+  # yieldables:
+  #   number: true
+  #   string: true
 
 # yielder = yielder.create do
 #   strict: false
+
+class TestIterable
+  @::[Symbol.iterator] = -> [][Symbol.iterator]!
 
 describe 'main', (___) ->
   it 'generator function to promise', -> Promise.all [
     yielder ->* yield 1
     .should.be.rejected
+
+    yielder 1
+    .should.eventually.equal 1
 
     yielder ->* 1
     .should.eventually.equal 1
@@ -53,40 +59,37 @@ describe 'main', (___) ->
     .should.eventually.equal 1
   ]
 
-  class TestIterable
-    @::[Symbol.iterator] = -> [][Symbol.iterator]!
-
   it 'iterable to promise', -> Promise.all [
-    yielder ~>* yield [
-      ~>* 3
-      ~>* 4
+    yielder ->* yield [
+      ->* yield new Promise -> &0 3
+      ->* 4
       5
     ]
     .should.eventually.eql [3, 4, 5]
 
-    (yielder.create yieldables: {array: true, iterable: true}) (~>* yield new TestIterable)
+    (yielder.create yieldables: {array: true, iterable: true}) (->* yield new TestIterable)
     .should.eventually.eql []
   ]
 
   it 'array to promise', -> Promise.all [
-    (yielder.create yieldables: {array: true, iterable: false}) (~>* yield [1 2 3])
+    (yielder.create yieldables: {array: true, iterable: false}) (->* yield [1 2 3])
     .should.eventually.eql [1 2 3]
 
-    (yielder.create yieldables: {array: true, iterable: false}) (~>* yield new TestIterable)
+    (yielder.create yieldables: {array: true, iterable: false}) (->* yield new TestIterable)
     .should.be.rejected
 
-    (yielder.create yieldables: {array: false, iterable: true}) (~>* yield [1 2 3 null])
+    (yielder.create yieldables: {array: false, iterable: true}) (->* yield [1 2 3 null])
     .should.eventually.eql [1 2 3 null]
 
-    (yielder.create yieldables: {array: false, iterable: false}) (~>* yield [1 2 3])
+    (yielder.create yieldables: {array: false, iterable: false}) (->* yield [1 2 3])
     .should.be.rejected
   ]
 
   it 'async to promise', -> Promise.all [
-    yielder ~>* yield (next) -> next null, 5
+    yielder ->* yield (next) -> next null, 5
     .should.eventually.eql 5
 
-    yielder ~>* yield (next) -> next (new Error), 123
+    yielder ->* yield (next) -> next (new Error), 123
     .should.be.rejected
   ]
 
@@ -96,16 +99,18 @@ describe 'main', (___) ->
     yielder ~>* yield then: then-mock 123123
     .should.eventually.eql 123123
 
-    (yielder.create strict-promises: true) (->* yield then: then-mock 123123)
+    strict-promises-yielder = yielder.create strict-promises: true
+
+    strict-promises-yielder ->* yield then: then-mock 123123
     .should.be.rejected
 
-    (yielder.create strict-promises: true) (->* yield then: (then-mock 123123), catch: ->)
+    strict-promises-yielder ->* yield then: (then-mock 123123), catch: !->
     .should.eventually.eql 123123
   ]
 
   it 'object to promise', -> Promise.all [
     yielder ~>* yield {
-      a: ~>* 4
+      a: ->* 4
       b: 5
       c: new Promise -> &0 2
     }
@@ -124,7 +129,10 @@ describe 'main', (___) ->
   it 'converter', -> Promise.all [
     do ->
       class CustomType
-      yielder2 = yielder.create to-promise: ((o, fallback) -> (o instanceof CustomType) and (fallback [1 2 3]) or fallback o)
+
+      yielder2 = yielder.create to-promise: (o, fallback) ->
+        | o instanceof CustomType => fallback [1 2 3]
+        | _ => fallback o
 
       yielder2 ->*
         yield {
@@ -139,6 +147,7 @@ describe 'main', (___) ->
     do ->
       class CustomType
       class CustomType2
+
       yielder2 = yielder.create to-promise: (o, fallback) ->
         | o instanceof CustomType => 1
         | o instanceof CustomType2 => fallback [1 2 3]
@@ -156,7 +165,6 @@ describe 'main', (___) ->
     do ->
       yielder2 = yielder.create to-promise: -> if _.is-number &0 => throw new Error 'something' else &1 &0
 
-      yielder2 ->*
-        yield {a: 1}
+      yielder2 ->* yield {a: 1}
       .should.be.rejected
   ]
