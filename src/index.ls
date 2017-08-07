@@ -108,7 +108,8 @@ create = (options ? {}) ->
             throw new Error '' if ..? and not is-promise ..
       | _ => fallback
 
-  main-promisificationator = to-promise
+  main-promisificationator = (yieldable) ->
+    (to-promise yieldable) ? new Promise !-> &0 yieldable
 
 module.exports = _.thru create!, (orig) -> _.assign orig,
   create: create
