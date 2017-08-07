@@ -11,7 +11,14 @@ npm install yielder
 
 ## Examples
 
+Use it as follows
+
 ```javascript
+yielder = require('yielder');
+
+// yielder is function
+// yielder.create is a function for creating defferently configured yielder
+
 yielder(function*(){
   return (yield [
     function*() {
