@@ -21,17 +21,13 @@ yielder = require('yielder');
 
 yielder(function*(){
   return (yield [
-    function*() {
-      return (yield new Promise((resolve) => resolve 3));
-    },
+    function*() { return (yield new Promise((resolve) => resolve(3))); },
     
     function*() { return 4; },
     
     5,
 
-    new Promise(function(resolve){
-      return setTimeout(function(){ resolve(1); }, 1000);
-    }),
+    new Promise(function(resolve){ return setTimeout(((__) => resolve(1)), 1000); }),
 
     function(next) { return next(null, 5); }
   ]);
@@ -40,7 +36,6 @@ yielder(function*(){
    // (because children of yielded [] will be also yielded)
 });
 ```
-
 
 Object is yieldable if yielder know how to create promise from it (or for job related to him). You can turn default rules on or off or fully override it by set `toPromise` option to function which accepts `object` it needs to convert and `fallback` – default conversion function.
 
@@ -74,9 +69,16 @@ yilder3(function*() { return (yield immutable.List([1, 2, 3])); }); // ok
 
 ```
 
+Yieldable can be yielded or returned like non-yieldable.
 
-You shouldn't yield non-yieldable ("synchronous") objects always keep in mind yielding and continuous calls. So by default yielder will fail in that cases to keep logic clean. You can allow yielding such objects by defining `strict` option. Internally it means that value will be converted to resolved promise.
-But again, aware of that. Try to understand generators instead.
+```javascript
+return (yield [function*() { return 4; }]) // => [4]
+return ([function*() { return 4; }]) // => [GeneratorFunction]
+```
+
+You shouldn't yield non-yieldable ("synchronous") objects to always keep in mind breaking and continuous calls, so by default yielder will break execution in that cases to keep logic clean. If you see error about that, almost aways it means developer error.
+
+You can allow yielding such objects by defining `strict` option. Internally it means that value will be converted to resolved promise. But again, aware of that. Try to understand generators instead.
 
 ```javascript
 yielder(function*(){ return 1; }); // ok: 1
@@ -85,7 +87,7 @@ yielder(function*(){ return (yield 1); }); // fail: number is non-yieldable
 yielder2 = yielder.create({ strict: false });
 
 yielder2(function*(){ return 1; }); // ok: 1
-yielder2(function*(){ return (yield 1); }); // ok: 1
+yielder2(function*(){ return (yield 1); }); // ok: 1. well, just technically ok.
 ```
 
 ## API
